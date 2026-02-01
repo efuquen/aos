@@ -70,8 +70,10 @@ void MemoryScheduler(virConnectPtr conn, int interval)
 	unsigned int flags = VIR_CONNECT_LIST_DOMAINS_RUNNING |
 						 VIR_CONNECT_LIST_DOMAINS_PERSISTENT;
 	ret = virConnectListAllDomains(conn, &domains, flags);
-	if (ret < 0)
-		error();
+	if (ret < 0) {
+		fprintf(stderr, "Failed to list domains\n");
+		return;
+	}
 	for (i = 0; i < ret; i++)
 	{
 		unsigned long max_mem = virDomainGetMaxMemory(domains[i]);
