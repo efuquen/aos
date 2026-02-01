@@ -64,5 +64,20 @@ COMPLETE THE IMPLEMENTATION
 */
 void MemoryScheduler(virConnectPtr conn, int interval)
 {
+	virDomainPtr *domains;
+	size_t i;
+	int ret;
+	unsigned int flags = VIR_CONNECT_LIST_DOMAINS_RUNNING |
+						 VIR_CONNECT_LIST_DOMAINS_PERSISTENT;
+	ret = virConnectListAllDomains(conn, &domains, flags);
+	if (ret < 0)
+		error();
+	for (i = 0; i < ret; i++)
+	{
+		unsigned long max_mem = virDomainGetMaxMemory(domains[i]);
+		printf("Domain %s Max Memory: %lu KB\n", virDomainGetName(domains[i]), max_mem);
 
+		virDomainFree(domains[i]);
+	}
+	free(domains);
 }
