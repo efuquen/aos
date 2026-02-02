@@ -74,10 +74,50 @@ void MemoryScheduler(virConnectPtr conn, int interval)
 		fprintf(stderr, "Failed to list domains\n");
 		return;
 	}
+
+	
+
 	for (i = 0; i < ret; i++)
 	{
-		unsigned long max_mem = virDomainGetMaxMemory(domains[i]);
-		printf("Domain %s Max Memory: %lu KB\n", virDomainGetName(domains[i]), max_mem);
+		if (virDomainSetMemoryStatsPeriod(domains[i], interval, VIR_DOMAIN_AFFECT_LIVE) < 0) {
+			fprintf(stderr, "Failed to set memory stats period.");
+			return;
+        }
+		double max_mem_mb = (double) virDomainGetMaxMemory(domains[i]) / 1024;
+		printf("Domain %s Max Memory: %.2f MB\n", virDomainGetName(domains[i]), max_mem_mb);
+
+		virDomainMemoryStatStruct stats[VIR_DOMAIN_MEMORY_STAT_NR];
+        int nr_stats = virDomainMemoryStats(domains[i], stats, VIR_DOMAIN_MEMORY_STAT_NR, 0);
+
+        if (nr_stats < 0) {
+            fprintf(stderr, "Error fetching memory stats.\n");
+            break;  
+        }
+
+        long long available = -1, usable = -1;//, unused = -1;
+
+        // 2. Parse the returned stats array
+        for (int i = 0; i < nr_stats; ++i) {
+            if (stats[i].tag == VIR_DOMAIN_MEMORY_STAT_AVAILABLE)
+                available = stats[i].val;
+            if (stats[i].tag == VIR_DOMAIN_MEMORY_STAT_USABLE)
+                usable = stats[i].val;
+            /*if (stats[i].tag == VIR_DOMAIN_MEMORY_STAT_UNUSED)
+                unused = stats[i].val;*/
+        }
+
+        // 3. Display calculations (Values are in KiB)
+        if (available != -1 && usable != -1) {
+            double used_mb = (double)(available - usable) / 1024;
+            double total_mb = (double)available / 1024 ;
+			double pct      = (used_mb / total_mb) * 100.0;
+
+			printf("Domain %s Memory Usage: %.2f MB / %.2f MB [%.1f%%]\n", virDomainGetName(domains[i]), used_mb, total_mb, pct);
+            fflush(stdout); // Keep line updated in-place using \r
+        } else {
+			printf("\rWaiting for balloon driver telemetry...");
+            fflush(stdout);
+        }
 
 		virDomainFree(domains[i]);
 	}
